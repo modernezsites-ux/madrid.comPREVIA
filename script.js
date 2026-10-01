@@ -47,6 +47,52 @@
   function openMenu(category) { const data = menus[category]; if (!data) return; showDialog(data.title, `<p>${data.intro}</p><ul class="menu-list">${data.items.map(([name, description]) => `<li><strong>${name}</strong><span>${description}</span></li>`).join('')}</ul><p class="dialog-notice">Cardápio ilustrativo. Sabores, preços e disponibilidade serão atualizados com as informações do restaurante.</p><a class="button button-gold" href="${contactHref('cardapio')}" target="_blank" rel="noopener noreferrer">Consultar cardápio</a>`); }
   document.querySelectorAll('[data-menu]').forEach(button => button.addEventListener('click', () => openMenu(button.dataset.menu)));
   document.querySelectorAll('[data-category]').forEach(link => link.addEventListener('click', event => { event.preventDefault(); closeMenu(); openMenu(link.dataset.category); }));
+  const dishes = document.querySelector('#pratos');
+  if (dishes) {
+    const photos = [
+      { src: 'assets/prato-parmegiana.webp', alt: 'Frango à parmegiana servido com molho e queijo', caption: 'Frango à parmegiana' },
+      { src: 'assets/prato-churrasco.webp', alt: 'Churrasco misto servido com acompanhamentos', caption: 'Churrasco misto' },
+      { src: 'assets/prato-moqueca.webp', alt: 'Moqueca servida em panela de barro com acompanhamentos', caption: 'Moqueca' },
+      { src: 'assets/prato-buffet-saladas.webp', alt: 'Balcão de buffet com saladas variadas', caption: 'Buffet de saladas' },
+      { src: 'assets/prato-feijoada.webp', alt: 'Feijoada servida em panela com arroz e acompanhamentos', caption: 'Feijoada' }
+    ];
+    const slides = [...dishes.querySelectorAll('.dishes-slide')];
+    const dots = [...dishes.querySelectorAll('.dishes-dot')];
+    const caption = dishes.querySelector('[data-dishes-caption]');
+    let current = 0, request = 0, timer = 0, inView = false;
+    photos.slice(1).forEach(photo => { const preload = new Image(); preload.src = photo.src; });
+    const syncTimer = () => {
+      window.clearInterval(timer);
+      if (inView && !document.hidden) timer = window.setInterval(() => showPhoto((current + 1) % photos.length), 7000);
+    };
+    const showPhoto = async index => {
+      if (index === current) { syncTimer(); return; }
+      const token = ++request, photo = photos[index], oldSlide = slides.find(slide => slide.classList.contains('is-active'));
+      const nextSlide = slides.find(slide => slide !== oldSlide);
+      if (nextSlide.getAttribute('src') !== photo.src) nextSlide.src = photo.src;
+      nextSlide.alt = photo.alt;
+      nextSlide.removeAttribute('aria-hidden');
+      try { if (nextSlide.decode) await nextSlide.decode(); } catch {}
+      if (token !== request) return;
+      nextSlide.classList.add('is-active');
+      oldSlide.classList.remove('is-active');
+      oldSlide.alt = '';
+      oldSlide.setAttribute('aria-hidden', 'true');
+      current = index;
+      caption.textContent = photo.caption;
+      dots.forEach((dot, dotIndex) => { const active = dotIndex === current; dot.classList.toggle('is-active', active); dot.setAttribute('aria-pressed', String(active)); });
+      syncTimer();
+    };
+    dots.forEach((dot, index) => dot.addEventListener('click', () => showPhoto(index)));
+    document.addEventListener('visibilitychange', syncTimer);
+    if ('IntersectionObserver' in window) {
+      const dishesObserver = new IntersectionObserver(entries => {
+        inView = entries.some(entry => entry.isIntersecting);
+        syncTimer();
+      }, { threshold: 0.15 });
+      dishesObserver.observe(dishes);
+    } else { inView = true; syncTimer(); }
+  }
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if ('IntersectionObserver' in window && !reduceMotion) {
     const reveals = document.querySelectorAll('.reveal');
